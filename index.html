@@ -1,747 +1,529 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Long Exposure Art - 長露光風フォト加工ツール</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
-        }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #1e293b;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #475569;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #64748b;
-        }
-        .canvas-container {
-            background-image: 
-                linear-gradient(45deg, #1e293b 25%, transparent 25%), 
-                linear-gradient(-45deg, #1e293b 25%, transparent 25%), 
-                linear-gradient(45deg, transparent 75%, #1e293b 75%), 
-                linear-gradient(-45deg, transparent 75%, #1e293b 75%);
-            background-size: 20px 20px;
-            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-        }
-        /* Loader animation */
-        .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border-left-color: #38bdf8;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>軌跡連動シャッター露光ジェネレーター</title>
+  <style>
+    :root {
+      --bg-color: #121214;
+      --card-bg: #1e1e24;
+      --accent-color: #007aff;
+      --accent-hover: #0056b3;
+      --text-color: #f0f0f5;
+      --border-color: #33333d;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    header p {
+      font-size: 0.85rem;
+      color: #aaa;
+      margin-top: 5px;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .workspace {
+      position: relative;
+      background-color: var(--card-bg);
+      border: 2px dashed var(--border-color);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 400px;
+      user-select: none;
+    }
+
+    .canvas-container {
+      position: relative;
+      display: inline-block;
+      max-width: 100%;
+      max-height: 70vh;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      max-height: 70vh;
+      object-fit: contain;
+    }
+
+    /* 描画レイヤーと背景レイヤーの重ね合わせ */
+    #imageCanvas {
+      position: relative;
+      z-index: 1;
+    }
+
+    #drawCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 2;
+      cursor: crosshair;
+    }
+
+    .upload-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: #888;
+      cursor: pointer;
+      padding: 40px;
+    }
+
+    .upload-placeholder svg {
+      width: 48px;
+      height: 48px;
+      fill: currentColor;
+    }
+
+    .controls {
+      background-color: var(--card-bg);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .control-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+    }
+
+    .control-group label {
+      color: #ccc;
+    }
+
+    input[type="range"] {
+      accent-color: var(--accent-color);
+    }
+
+    .btn {
+      background-color: #2c2c35;
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background-color: #3a3a46;
+    }
+
+    .btn-primary {
+      background-color: var(--accent-color);
+      border-color: var(--accent-color);
+    }
+
+    .btn-primary:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-twitter {
+      background-color: #1da1f2;
+      border-color: #1da1f2;
+    }
+
+    .btn-twitter:hover {
+      background-color: #0c85d0;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    .status-text {
+      font-size: 0.85rem;
+      color: #00ff88;
+      min-height: 1.2em;
+    }
+  </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between">
+<body>
 
-    <header class="bg-slate-900/80 backdrop-blur border-b border-slate-800 sticky top-0 z-50 px-4 py-3">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                <div class="bg-gradient-to-tr from-cyan-500 to-blue-600 p-2 rounded-xl text-white shadow-lg shadow-cyan-500/20">
-                    <i class="fa-solid font-bold fa-camera-retro text-xl"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-lg leading-tight bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">LongExp Art</h1>
-                    <p class="text-xs text-slate-400">長押しシャッター・スローシャッター加工</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-2 text-xs font-medium text-slate-400">
-                <span class="hidden sm:inline-block px-2.5 py-1 bg-slate-800 rounded-full border border-slate-700">GitHub Pages 対応</span>
-            </div>
+  <header>
+    <h1>軌跡ブレ長露光ジェネレーター</h1>
+    <p>画像をアップロードし、マウスや指でなぞった軌跡（手振れ）に合わせて全体をブレさせます。</p>
+  </header>
+
+  <div class="container">
+    <div class="workspace" id="dropZone">
+      <div class="upload-placeholder" id="placeholder" onclick="document.getElementById('fileInput').click()">
+        <svg viewBox="0 0 24 24">
+          <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+        </svg>
+        <span>クリックまたはドラッグ＆ドロップで画像をアップロード</span>
+      </div>
+
+      <div class="canvas-container" id="canvasContainer" style="display: none;">
+        <canvas id="imageCanvas"></canvas>
+        <canvas id="drawCanvas"></canvas>
+      </div>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*">
+
+    <div class="controls">
+      <div class="control-row">
+        <button class="btn" onclick="document.getElementById('fileInput').click()">画像を変更</button>
+        <button class="btn" id="clearStrokeBtn">軌跡をリセット</button>
+        <div class="control-group">
+          <label for="stepInput">サンプリング密度:</label>
+          <input type="range" id="stepInput" min="1" max="10" value="2" title="小さいほどなめらかにブレます">
         </div>
-    </header>
-
-    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-        <!-- Control Panel Sidebar -->
-        <div class="lg:col-span-4 flex flex-col gap-5">
-            
-            <!-- Step Indicator -->
-            <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-4 shadow-xl">
-                <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                    <i class="fa-solid fa-list-check text-cyan-400"></i> 作業ステップ
-                </h2>
-                <div class="grid grid-cols-4 gap-2 text-center text-xs">
-                    <div id="step-1" class="py-2 rounded-lg bg-cyan-500/20 text-cyan-300 font-medium border border-cyan-500/30">1. 画像</div>
-                    <div id="step-2" class="py-2 rounded-lg bg-slate-900 text-slate-500 border border-slate-800">2. ドロー</div>
-                    <div id="step-3" class="py-2 rounded-lg bg-slate-900 text-slate-500 border border-slate-800">3. 加工</div>
-                    <div id="step-4" class="py-2 rounded-lg bg-slate-900 text-slate-500 border border-slate-800">4. 保存</div>
-                </div>
-            </div>
-
-            <!-- Upload Area & Controls -->
-            <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-xl space-y-4">
-                <div class="flex justify-between items-center">
-                    <h2 class="font-bold text-slate-200 flex items-center gap-2">
-                        <i class="fa-solid fa-image text-cyan-400"></i> 1. 画像アップロード
-                    </h2>
-                    <button id="reset-image-btn" class="text-xs text-slate-400 hover:text-rose-400 transition hidden">
-                        <i class="fa-solid fa-rotate-left mr-1"></i>リセット
-                    </button>
-                </div>
-
-                <!-- Dropzone -->
-                <div id="dropzone" class="border-2 border-dashed border-slate-600 hover:border-cyan-400 transition rounded-xl p-6 text-center cursor-pointer bg-slate-900/40 hover:bg-slate-900/80 group">
-                    <input type="file" id="image-input" accept="image/*" class="hidden">
-                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 group-hover:text-cyan-400 group-hover:scale-110 transition-all mb-2"></i>
-                    <p class="text-sm font-medium text-slate-300">クリックまたはドラッグ＆ドロップ</p>
-                    <p class="text-xs text-slate-500 mt-1">PNG, JPG, WEBP (クリップボード貼り付け可)</p>
-                </div>
-            </div>
-
-            <!-- Drawing Tools -->
-            <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-xl space-y-4">
-                <div class="flex justify-between items-center">
-                    <h2 class="font-bold text-slate-200 flex items-center gap-2">
-                        <i class="fa-solid fa-paintbrush text-cyan-400"></i> 2. フリーハンドドロー
-                    </h2>
-                    <span class="text-xs text-slate-400">光の軌跡を描く</span>
-                </div>
-
-                <div class="space-y-3">
-                    <!-- Tool Selectors -->
-                    <div class="grid grid-cols-2 gap-2">
-                        <button id="brush-tool-btn" class="py-2 px-3 bg-cyan-600 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-cyan-600/30 transition">
-                            <i class="fa-solid fa-pen"></i> ブラシ
-                        </button>
-                        <button id="eraser-tool-btn" class="py-2 px-3 bg-slate-700 text-slate-300 hover:bg-slate-600 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition">
-                            <i class="fa-solid fa-eraser"></i> 消しゴム
-                        </button>
-                    </div>
-
-                    <!-- Brush Size & Color -->
-                    <div class="space-y-2 pt-2">
-                        <div class="flex justify-between text-xs text-slate-300">
-                            <span>ブラシ太さ</span>
-                            <span id="brush-size-val" class="text-cyan-400 font-mono">15px</span>
-                        </div>
-                        <input type="range" id="brush-size" min="3" max="60" value="15" class="w-full accent-cyan-400">
-                    </div>
-
-                    <div class="flex items-center justify-between pt-1">
-                        <span class="text-xs text-slate-300">ブラシカラー</span>
-                        <div class="flex items-center gap-2">
-                            <input type="color" id="brush-color" value="#38bdf8" class="w-8 h-8 rounded border-0 cursor-pointer bg-transparent">
-                            <!-- Preset Swatches -->
-                            <div class="flex gap-1">
-                                <button class="w-6 h-6 rounded-full bg-cyan-400 border border-slate-600 color-swatch" data-color="#38bdf8"></button>
-                                <button class="w-6 h-6 rounded-full bg-amber-300 border border-slate-600 color-swatch" data-color="#fcd34d"></button>
-                                <button class="w-6 h-6 rounded-full bg-rose-500 border border-slate-600 color-swatch" data-color="#f43f5e"></button>
-                                <button class="w-6 h-6 rounded-full bg-emerald-400 border border-slate-600 color-swatch" data-color="#34d399"></button>
-                                <button class="w-6 h-6 rounded-full bg-white border border-slate-600 color-swatch" data-color="#ffffff"></button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="flex gap-2 pt-2">
-                        <button id="undo-btn" class="flex-1 py-1.5 px-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1">
-                            <i class="fa-solid fa-rotate-left"></i> 元に戻す
-                        </button>
-                        <button id="clear-draw-btn" class="flex-1 py-1.5 px-3 bg-slate-700 hover:bg-rose-900/50 hover:text-rose-200 text-slate-200 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1">
-                            <i class="fa-solid fa-trash"></i> 全消去
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Effect Adjustments & Action -->
-            <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-xl space-y-4">
-                <h2 class="font-bold text-slate-200 flex items-center gap-2">
-                    <i class="fa-solid fa-wand-magic-sparkles text-cyan-400"></i> 3. シャッター効果パラメータ
-                </h2>
-
-                <div class="space-y-3">
-                    <div>
-                        <div class="flex justify-between text-xs text-slate-300 mb-1">
-                            <span>光の残像長（Exposure Blur）</span>
-                            <span id="blur-length-val" class="text-cyan-400 font-mono">25</span>
-                        </div>
-                        <input type="range" id="blur-length" min="5" max="60" value="25" class="w-full accent-cyan-400">
-                    </div>
-
-                    <div>
-                        <div class="flex justify-between text-xs text-slate-300 mb-1">
-                            <span>ブレ方向 (Angle)</span>
-                            <span id="blur-angle-val" class="text-cyan-400 font-mono">45°</span>
-                        </div>
-                        <input type="range" id="blur-angle" min="0" max="360" value="45" class="w-full accent-cyan-400">
-                    </div>
-
-                    <div>
-                        <div class="flex justify-between text-xs text-slate-300 mb-1">
-                            <span>輝度・オーロラグロー (Glow Boost)</span>
-                            <span id="glow-intensity-val" class="text-cyan-400 font-mono">1.8</span>
-                        </div>
-                        <input type="range" id="glow-intensity" min="1" max="3" step="0.1" value="1.8" class="w-full accent-cyan-400">
-                    </div>
-
-                    <div>
-                        <div class="flex justify-between text-xs text-slate-300 mb-1">
-                            <span>写真全体の微スローシャッター</span>
-                            <span id="bg-blur-val" class="text-cyan-400 font-mono">2px</span>
-                        </div>
-                        <input type="range" id="bg-blur" min="0" max="10" value="2" class="w-full accent-cyan-400">
-                    </div>
-                </div>
-
-                <button id="apply-effect-btn" class="w-full py-3 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/25 transition transform active:scale-95 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-bolt"></i> 長押しシャッター効果を生成
-                </button>
-            </div>
-
-            <!-- Download & Share -->
-            <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-xl space-y-3">
-                <h2 class="font-bold text-slate-200 flex items-center gap-2">
-                    <i class="fa-solid fa-share-nodes text-cyan-400"></i> 4. 保存・共有
-                </h2>
-                
-                <div class="grid grid-cols-2 gap-3">
-                    <button id="download-btn" disabled class="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition">
-                        <i class="fa-solid fa-download"></i> 保存 (PNG)
-                    </button>
-                    <button id="twitter-share-btn" disabled class="py-2.5 px-3 bg-sky-500 hover:bg-sky-400 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition">
-                        <i class="fa-brands fa-x-twitter"></i> Xに投稿
-                    </button>
-                </div>
-            </div>
-
-        </div>
-
-        <!-- Canvas Display Area -->
-        <div class="lg:col-span-8 flex flex-col">
-            <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-4 shadow-xl flex-1 flex flex-col justify-between">
-                
-                <!-- Canvas Top Bar -->
-                <div class="flex justify-between items-center mb-3">
-                    <div class="flex items-center gap-2">
-                        <span id="status-badge" class="px-2.5 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-full flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> 画像未設定
-                        </span>
-                    </div>
-                    <div class="text-xs text-slate-400 font-mono" id="canvas-dimensions">
-                        0 x 0 px
-                    </div>
-                </div>
-
-                <!-- Main Canvas Interactive Box -->
-                <div class="relative w-full flex-1 flex items-center justify-center min-h-[380px] md:min-h-[520px] rounded-xl overflow-hidden canvas-container border border-slate-700" id="canvas-wrapper">
-                    
-                    <!-- Empty State Prompt -->
-                    <div id="empty-state" class="text-center p-6 space-y-3">
-                        <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto border border-slate-700 text-cyan-400 text-2xl">
-                            <i class="fa-solid fa-image"></i>
-                        </div>
-                        <p class="text-slate-300 font-medium">画像を選択またはドロップしてください</p>
-                        <p class="text-xs text-slate-500">ドラッグして線を引くと、光のシャッター残像に加工されます</p>
-                    </div>
-
-                    <!-- Processing Spinner Overlay -->
-                    <div id="loading-overlay" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center hidden">
-                        <div class="spinner mb-3"></div>
-                        <p class="text-cyan-400 font-semibold text-sm">露光・シャッターエフェクト合成中...</p>
-                        <p class="text-xs text-slate-400 mt-1">光の軌跡とモーションブラーを処理しています</p>
-                    </div>
-
-                    <!-- Display Layers -->
-                    <div id="canvas-stack" class="relative max-w-full max-h-full hidden">
-                        <!-- Render Canvas (Shown to user for drawing and final output) -->
-                        <canvas id="main-canvas" class="block rounded shadow-2xl max-w-full max-h-[70vh] cursor-crosshair object-contain"></canvas>
-                    </div>
-
-                </div>
-
-                <!-- Guidance Footer -->
-                <div class="mt-3 text-xs text-slate-400 flex items-center justify-between">
-                    <span class="flex items-center gap-1">
-                        <i class="fa-solid fa-circle-info text-cyan-400"></i>
-                        ヒント: 色を変えてラインを描くとネオンやライトアート風の加工ができます。
-                    </span>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <!-- Footer -->
-    <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
-        <p>&copy; 2026 Long Exposure Art Generator - Free Standalone HTML WebApp</p>
-    </footer>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // DOM Elements
-            const imageInput = document.getElementById('image-input');
-            const dropzone = document.getElementById('dropzone');
-            const mainCanvas = document.getElementById('main-canvas');
-            const ctx = mainCanvas.getContext('2d');
-            const emptyState = document.getElementById('empty-state');
-            const canvasStack = document.getElementById('canvas-stack');
-            const loadingOverlay = document.getElementById('loading-overlay');
-            const statusBadge = document.getElementById('status-badge');
-            const canvasDimensions = document.getElementById('canvas-dimensions');
-            const resetImageBtn = document.getElementById('reset-image-btn');
-
-            // Controls
-            const brushToolBtn = document.getElementById('brush-tool-btn');
-            const eraserToolBtn = document.getElementById('eraser-tool-btn');
-            const brushSizeInput = document.getElementById('brush-size');
-            const brushSizeVal = document.getElementById('brush-size-val');
-            const brushColorInput = document.getElementById('brush-color');
-            const colorSwatches = document.querySelectorAll('.color-swatch');
-            const undoBtn = document.getElementById('undo-btn');
-            const clearDrawBtn = document.getElementById('clear-draw-btn');
-            const applyEffectBtn = document.getElementById('apply-effect-btn');
-            const downloadBtn = document.getElementById('download-btn');
-            const twitterShareBtn = document.getElementById('twitter-share-btn');
-
-            // Effect sliders & inputs
-            const blurLengthInput = document.getElementById('blur-length');
-            const blurLengthVal = document.getElementById('blur-length-val');
-            const blurAngleInput = document.getElementById('blur-angle');
-            const blurAngleVal = document.getElementById('blur-angle-val');
-            const glowIntensityInput = document.getElementById('glow-intensity');
-            const glowIntensityVal = document.getElementById('glow-intensity-val');
-            const bgBlurInput = document.getElementById('bg-blur');
-            const bgBlurVal = document.getElementById('bg-blur-val');
-
-            // Step Indicators
-            const step1 = document.getElementById('step-1');
-            const step2 = document.getElementById('step-2');
-            const step3 = document.getElementById('step-3');
-            const step4 = document.getElementById('step-4');
-
-            // State Variables
-            let originalImage = null;
-            let currentMode = 'brush'; // 'brush' or 'eraser'
-            let isDrawing = false;
-            let drawingPaths = []; // Array of path strokes
-            let currentPath = null;
-            let processedImageDataUrl = null;
-
-            // Offscreen canvases for layer separation
-            const drawingCanvas = document.createElement('canvas');
-            const drawingCtx = drawingCanvas.getContext('2d');
-
-            dropzone.addEventListener('click', () => imageInput.click());
-            imageInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0]));
-
-            dropzone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropzone.classList.add('border-cyan-400', 'bg-slate-800');
-            });
-
-            dropzone.addEventListener('dragleave', () => {
-                dropzone.classList.remove('border-cyan-400', 'bg-slate-800');
-            });
-
-            dropzone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropzone.classList.remove('border-cyan-400', 'bg-slate-800');
-                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                    handleFileSelect(e.dataTransfer.files[0]);
-                }
-            });
-
-            // Clipboard paste handling
-            window.addEventListener('paste', (e) => {
-                const items = e.clipboardData.items;
-                for (let i = 0; i < items.length; i++) {
-                    if (items[i].type.indexOf('image') !== -1) {
-                        const file = items[i].getAsFile();
-                        handleFileSelect(file);
-                        break;
-                    }
-                }
-            });
-
-            resetImageBtn.addEventListener('click', resetAll);
-
-            function handleFileSelect(file) {
-                if (!file || !file.type.match('image.*')) return;
-
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        originalImage = img;
-                        initCanvasSize(img.width, img.height);
-                        drawingPaths = [];
-                        redrawAllLayers();
-                        
-                        // Update UI Steps & Status
-                        emptyState.classList.add('hidden');
-                        canvasStack.classList.remove('hidden');
-                        resetImageBtn.classList.remove('hidden');
-                        
-                        statusBadge.className = 'px-2.5 py-1 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-semibold rounded-full flex items-center gap-1.5';
-                        statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-cyan-400"></span> 画像ロード完了';
-                        
-                        setStepActive(step2);
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            }
-
-            function initCanvasSize(width, height) {
-                // Limit maximum canvas dimensions to avoid memory issues
-                const MAX_DIM = 2048;
-                let w = width;
-                let h = height;
-                if (w > MAX_DIM || h > MAX_DIM) {
-                    if (w > h) {
-                        h = Math.round((h * MAX_DIM) / w);
-                        w = MAX_DIM;
-                    } else {
-                        w = Math.round((w * MAX_DIM) / h);
-                        h = MAX_DIM;
-                    }
-                }
-
-                mainCanvas.width = w;
-                mainCanvas.height = h;
-                drawingCanvas.width = w;
-                drawingCanvas.height = h;
-
-                canvasDimensions.textContent = `${w} x ${h} px`;
-            }
-
-            function setStepActive(targetStep) {
-                [step1, step2, step3, step4].forEach(step => {
-                    step.className = 'py-2 rounded-lg bg-slate-900 text-slate-500 border border-slate-800';
-                });
-                targetStep.className = 'py-2 rounded-lg bg-cyan-500/20 text-cyan-300 font-medium border border-cyan-500/30';
-            }
-
-            function resetAll() {
-                originalImage = null;
-                drawingPaths = [];
-                processedImageDataUrl = null;
-                ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
-                drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-
-                emptyState.classList.remove('hidden');
-                canvasStack.classList.add('hidden');
-                resetImageBtn.classList.add('hidden');
-                downloadBtn.disabled = true;
-                twitterShareBtn.disabled = true;
-
-                statusBadge.className = 'px-2.5 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-full flex items-center gap-1.5';
-                statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> 画像未設定';
-                canvasDimensions.textContent = '0 x 0 px';
-
-                setStepActive(step1);
-            }
-
-            brushToolBtn.addEventListener('click', () => setTool('brush'));
-            eraserToolBtn.addEventListener('click', () => setTool('eraser'));
-
-            function setTool(mode) {
-                currentMode = mode;
-                if (mode === 'brush') {
-                    brushToolBtn.className = 'py-2 px-3 bg-cyan-600 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-cyan-600/30 transition';
-                    eraserToolBtn.className = 'py-2 px-3 bg-slate-700 text-slate-300 hover:bg-slate-600 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition';
-                } else {
-                    eraserToolBtn.className = 'py-2 px-3 bg-cyan-600 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-cyan-600/30 transition';
-                    brushToolBtn.className = 'py-2 px-3 bg-slate-700 text-slate-300 hover:bg-slate-600 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition';
-                }
-            }
-
-            brushSizeInput.addEventListener('input', (e) => {
-                brushSizeVal.textContent = `${e.target.value}px`;
-            });
-
-            colorSwatches.forEach(swatch => {
-                swatch.addEventListener('click', () => {
-                    const color = swatch.dataset.color;
-                    brushColorInput.value = color;
-                    setTool('brush');
-                });
-            });
-
-            undoBtn.addEventListener('click', () => {
-                if (drawingPaths.length > 0) {
-                    drawingPaths.pop();
-                    redrawAllLayers();
-                }
-            });
-
-            clearDrawBtn.addEventListener('click', () => {
-                drawingPaths = [];
-                redrawAllLayers();
-            });
-
-            // Canvas Drawing Input Event Listeners
-            function getCanvasCoords(e) {
-                const rect = mainCanvas.getBoundingClientRect();
-                const scaleX = mainCanvas.width / rect.width;
-                const scaleY = mainCanvas.height / rect.height;
-
-                let clientX = e.clientX;
-                let clientY = e.clientY;
-
-                if (e.touches && e.touches.length > 0) {
-                    clientX = e.touches[0].clientX;
-                    clientY = e.touches[0].clientY;
-                }
-
-                return {
-                    x: (clientX - rect.left) * scaleX,
-                    y: (clientY - rect.top) * scaleY
-                };
-            }
-
-            function startDrawing(e) {
-                if (!originalImage) return;
-                e.preventDefault();
-                isDrawing = true;
-                const coords = getCanvasCoords(e);
-                currentPath = {
-                    mode: currentMode,
-                    color: brushColorInput.value,
-                    size: parseInt(brushSizeInput.value, 10),
-                    points: [coords]
-                };
-                drawingPaths.push(currentPath);
-                redrawAllLayers();
-            }
-
-            function drawMove(e) {
-                if (!isDrawing || !currentPath) return;
-                e.preventDefault();
-                const coords = getCanvasCoords(e);
-                currentPath.points.push(coords);
-                redrawAllLayers();
-            }
-
-            function stopDrawing() {
-                isDrawing = false;
-                currentPath = null;
-            }
-
-            mainCanvas.addEventListener('mousedown', startDrawing);
-            mainCanvas.addEventListener('mousemove', drawMove);
-            window.addEventListener('mouseup', stopDrawing);
-
-            mainCanvas.addEventListener('touchstart', startDrawing, { passive: false });
-            mainCanvas.addEventListener('touchmove', drawMove, { passive: false });
-            window.addEventListener('touchend', stopDrawing);
-
-            function redrawAllLayers() {
-                if (!originalImage) return;
-
-                // Clear Main & Offscreen Canvas
-                ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
-                drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-
-                // 1. Draw Original Image as Base
-                ctx.drawImage(originalImage, 0, 0, mainCanvas.width, mainCanvas.height);
-
-                // 2. Draw Paths onto Drawing Layer
-                drawingPaths.forEach(path => {
-                    if (path.points.length < 1) return;
-
-                    drawingCtx.save();
-                    drawingCtx.lineCap = 'round';
-                    drawingCtx.lineJoin = 'round';
-                    drawingCtx.lineWidth = path.size;
-
-                    if (path.mode === 'eraser') {
-                        drawingCtx.globalCompositeOperation = 'destination-out';
-                        drawingCtx.strokeStyle = 'rgba(0,0,0,1)';
-                    } else {
-                        drawingCtx.globalCompositeOperation = 'source-over';
-                        drawingCtx.strokeStyle = path.color;
-                    }
-
-                    drawingCtx.beginPath();
-                    drawingCtx.moveTo(path.points[0].x, path.points[0].y);
-
-                    for (let i = 1; i < path.points.length; i++) {
-                        drawingCtx.lineTo(path.points[i].x, path.points[i].y);
-                    }
-                    drawingCtx.stroke();
-                    drawingCtx.restore();
-                });
-
-                // Composite vector lines on top of preview
-                ctx.drawImage(drawingCanvas, 0, 0);
-            }
-
-            // Slider value updates
-            blurLengthInput.addEventListener('input', (e) => blurLengthVal.textContent = e.target.value);
-            blurAngleInput.addEventListener('input', (e) => blurAngleVal.textContent = `${e.target.value}°`);
-            glowIntensityInput.addEventListener('input', (e) => glowIntensityVal.textContent = e.target.value);
-            bgBlurInput.addEventListener('input', (e) => bgBlurVal.textContent = `${e.target.value}px`);
-
-            applyEffectBtn.addEventListener('click', async () => {
-                if (!originalImage) {
-                    alert('最初に画像をアップロードしてください。');
-                    return;
-                }
-
-                setStepActive(step3);
-                loadingOverlay.classList.remove('hidden');
-
-                // Async delay to allow UI spinner to update
-                setTimeout(() => {
-                    processLongExposureEffect();
-                    loadingOverlay.classList.add('hidden');
-                    downloadBtn.disabled = false;
-                    twitterShareBtn.disabled = false;
-                    
-                    setStepActive(step4);
-                    statusBadge.className = 'px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold rounded-full flex items-center gap-1.5';
-                    statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span> 加工完了！';
-                }, 100);
-            });
-
-            function processLongExposureEffect() {
-                const w = mainCanvas.width;
-                const h = mainCanvas.height;
-
-                const blurLength = parseInt(blurLengthInput.value, 10);
-                const angleRad = (parseInt(blurAngleInput.value, 10) * Math.PI) / 180;
-                const glowBoost = parseFloat(glowIntensityInput.value);
-                const bgBlur = parseInt(bgBlurInput.value, 10);
-
-                const dx = Math.cos(angleRad);
-                const dy = Math.sin(angleRad);
-
-                // Temporary canvases for effect layers
-                const bgCanvas = document.createElement('canvas');
-                bgCanvas.width = w; bgCanvas.height = h;
-                const bgCtx = bgCanvas.getContext('2d');
-
-                const streakCanvas = document.createElement('canvas');
-                streakCanvas.width = w; streakCanvas.height = h;
-                const streakCtx = streakCanvas.getContext('2d');
-
-                // 1. Render Background with Shutter Blur & Exposure Boost
-                bgCtx.save();
-                if (bgBlur > 0) {
-                    bgCtx.filter = `blur(${bgBlur}px)`;
-                }
-                bgCtx.drawImage(originalImage, 0, 0, w, h);
-                bgCtx.restore();
-
-                // Slight background motion blur overlay
-                if (bgBlur > 0) {
-                    bgCtx.save();
-                    bgCtx.globalAlpha = 0.3;
-                    bgCtx.globalCompositeOperation = 'screen';
-                    for (let step = 1; step <= 3; step++) {
-                        const shiftX = dx * step * (bgBlur * 0.8);
-                        const shiftY = dy * step * (bgBlur * 0.8);
-                        bgCtx.drawImage(originalImage, shiftX, shiftY, w, h);
-                    }
-                    bgCtx.restore();
-                }
-
-                // 2. Render Light Streak / Trail effect from hand-drawn lines
-                // Directional Accumulation (Simulating Motion Blur along angle)
-                streakCtx.save();
-                const numPasses = Math.min(blurLength, 40);
-                const stepDistance = blurLength / numPasses;
-
-                // Base strokes drawing
-                streakCtx.drawImage(drawingCanvas, 0, 0);
-
-                // Multi-pass directional light accumulation
-                for (let i = 1; i <= numPasses; i++) {
-                    const alpha = Math.pow(1 - (i / numPasses), 1.2) * 0.4;
-                    const offsetX = dx * i * stepDistance;
-                    const offsetY = dy * i * stepDistance;
-
-                    // Forward streak
-                    streakCtx.save();
-                    streakCtx.globalAlpha = alpha;
-                    streakCtx.globalCompositeOperation = 'lighter'; // Additive blending for light
-                    streakCtx.drawImage(drawingCanvas, offsetX, offsetY);
-                    // Backward streak (so light spreads naturally)
-                    streakCtx.drawImage(drawingCanvas, -offsetX * 0.4, -offsetY * 0.4);
-                    streakCtx.restore();
-                }
-
-                // Apply Glow Softening
-                const glowCanvas = document.createElement('canvas');
-                glowCanvas.width = w; glowCanvas.height = h;
-                const glowCtx = glowCanvas.getContext('2d');
-
-                glowCtx.save();
-                glowCtx.filter = `blur(${Math.max(6, blurLength * 0.4)}px)`;
-                glowCtx.drawImage(streakCanvas, 0, 0);
-                glowCtx.restore();
-
-                // 3. Composite Final Artwork onto Main Canvas
-                ctx.clearRect(0, 0, w, h);
-
-                // Draw Base Image Layer
-                ctx.drawImage(bgCanvas, 0, 0);
-
-                // Blend Light Glow Layer (Lighter/Screen Composite)
-                ctx.save();
-                ctx.globalCompositeOperation = 'lighter';
-                ctx.globalAlpha = glowBoost * 0.7;
-                ctx.drawImage(glowCanvas, 0, 0);
-
-                // Composite Sharp Light Core
-                ctx.globalAlpha = Math.min(1.0, glowBoost * 0.9);
-                ctx.drawImage(streakCanvas, 0, 0);
-                
-                // Add center crisp drawing layer for fine detail
-                ctx.globalCompositeOperation = 'source-over';
-                ctx.globalAlpha = 0.85;
-                ctx.drawImage(drawingCanvas, 0, 0);
-                ctx.restore();
-
-                // Cache final result Data URL
-                processedImageDataUrl = mainCanvas.toDataURL('image/png');
-            }
-
-            downloadBtn.addEventListener('click', () => {
-                if (!processedImageDataUrl) return;
-
-                const link = document.createElement('a');
-                link.download = `long-exposure-art-${Date.now()}.png`;
-                link.href = processedImageDataUrl;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            });
-
-            twitterShareBtn.addEventListener('click', () => {
-                // Prompt user to save image since Twitter Web Intent cannot attach binary file directly
-                const tweetText = encodeURIComponent('長露光・スローシャッター風の光の軌跡写真を生成しました！✨\n#LongExpArt #画像加工 #スローシャッター');
-                const shareUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
-
-                // Notification toast
-                alert('【X (Twitter) 投稿のヒント】\n\nXの仕様上、WEBページからの自動画像添付ができません。\n「保存」ボタンで画像をダウンロードしてから、開いたツイート画面に画像を保存・添付してご投稿ください！');
-
-                // Open Twitter Web Intent
-                window.open(shareUrl, '_blank', 'noopener,noreferrer');
-            });
-        });
-    </script>
+      </div>
+
+      <div class="control-row">
+        <button class="btn btn-primary" id="processBtn" disabled>
+          長押し露光を実行（軌跡でブレ作成）
+        </button>
+        <button class="btn" id="downloadBtn" disabled>画像を保存</button>
+        <button class="btn btn-twitter" id="twitterBtn" disabled>X (Twitter) で投稿</button>
+      </div>
+
+      <div class="status-text" id="statusText"></div>
+    </div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+    const placeholder = document.getElementById('placeholder');
+    const canvasContainer = document.getElementById('canvasContainer');
+    
+    const imageCanvas = document.getElementById('imageCanvas');
+    const imgCtx = imageCanvas.getContext('2d');
+    
+    const drawCanvas = document.getElementById('drawCanvas');
+    const drawCtx = drawCanvas.getContext('2d');
+
+    const processBtn = document.getElementById('processBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const twitterBtn = document.getElementById('twitterBtn');
+    const clearStrokeBtn = document.getElementById('clearStrokeBtn');
+    const statusText = document.getElementById('statusText');
+    const stepInput = document.getElementById('stepInput');
+
+    let originalImage = null;
+    let strokePoints = [];
+    let isDrawing = false;
+    let isProcessed = false;
+
+    // --- ファイル読み込み処理 ---
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        loadImage(e.target.files[0]);
+      }
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.style.borderColor = 'var(--accent-color)';
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.style.borderColor = 'var(--border-color)';
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.style.borderColor = 'var(--border-color)';
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        loadImage(e.dataTransfer.files[0]);
+      }
+    });
+
+    function loadImage(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          originalImage = img;
+          
+          // Canvasサイズの設定（オリジナル解像度を保持）
+          imageCanvas.width = img.width;
+          imageCanvas.height = img.height;
+          drawCanvas.width = img.width;
+          drawCanvas.height = img.height;
+
+          // 画像の初期描画
+          imgCtx.drawImage(img, 0, 0);
+
+          placeholder.style.display = 'none';
+          canvasContainer.style.display = 'inline-block';
+          
+          resetStroke();
+          statusText.textContent = "画像の上をドラッグしてカメラの移動軌跡を描いてください。";
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // --- ドローイング（手振れ軌跡の記録）処理 ---
+    function getCanvasCoords(e) {
+      const rect = drawCanvas.getBoundingClientRect();
+      const scaleX = drawCanvas.width / rect.width;
+      const scaleY = drawCanvas.height / rect.height;
+
+      let clientX, clientY;
+      if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+      };
+    }
+
+    function startDrawing(e) {
+      if (!originalImage) return;
+      isDrawing = true;
+      resetStroke();
+      const pos = getCanvasCoords(e);
+      strokePoints.push(pos);
+      redrawStroke();
+    }
+
+    function draw(e) {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const pos = getCanvasCoords(e);
+      strokePoints.push(pos);
+      redrawStroke();
+    }
+
+    function stopDrawing() {
+      if (!isDrawing) return;
+      isDrawing = false;
+      if (strokePoints.length > 1) {
+        processBtn.disabled = false;
+        statusText.textContent = "軌跡を記録しました。「長押し露光を実行」を押してください。";
+      }
+    }
+
+    drawCanvas.addEventListener('mousedown', startDrawing);
+    drawCanvas.addEventListener('mousemove', draw);
+    window.addEventListener('mouseup', stopDrawing);
+
+    drawCanvas.addEventListener('touchstart', startDrawing, { passive: false });
+    drawCanvas.addEventListener('touchmove', draw, { passive: false });
+    window.addEventListener('touchend', stopDrawing);
+
+    function redrawStroke() {
+      drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      if (strokePoints.length < 2) return;
+
+      drawCtx.beginPath();
+      drawCtx.moveTo(strokePoints[0].x, strokePoints[0].y);
+      for (let i = 1; i < strokePoints.length; i++) {
+        drawCtx.lineTo(strokePoints[i].x, strokePoints[i].y);
+      }
+      
+      // 描画された軌跡を目視しやすく可視化（赤い誘導線）
+      drawCtx.strokeStyle = 'rgba(255, 58, 48, 0.8)';
+      drawCtx.lineWidth = Math.max(3, Math.min(drawCanvas.width, drawCanvas.height) / 200);
+      drawCtx.lineCap = 'round';
+      drawCtx.lineJoin = 'round';
+      drawCtx.stroke();
+
+      // 始点（基準点）を青い丸で強調
+      drawCtx.beginPath();
+      drawCtx.arc(strokePoints[0].x, strokePoints[0].y, drawCtx.lineWidth * 1.5, 0, Math.PI * 2);
+      drawCtx.fillStyle = '#007aff';
+      drawCtx.fill();
+    }
+
+    function resetStroke() {
+      strokePoints = [];
+      drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      if (originalImage) {
+        imgCtx.drawImage(originalImage, 0, 0);
+      }
+      processBtn.disabled = true;
+      downloadBtn.disabled = true;
+      twitterBtn.disabled = true;
+      isProcessed = false;
+    }
+
+    clearStrokeBtn.addEventListener('click', () => {
+      resetStroke();
+      statusText.textContent = "軌跡をクリアしました。再度なぞってください。";
+    });
+
+    // --- 長露光・軌跡ブレ演算処理 ---
+    processBtn.addEventListener('click', () => {
+      if (!originalImage || strokePoints.length < 2) return;
+
+      statusText.textContent = "画像をレンダリング中...";
+      
+      // 非同期処理でUIフリーズを回避
+      setTimeout(() => {
+        applyPathBlur();
+        statusText.textContent = "長露光（軌跡ブレ）処理が完了しました！";
+        downloadBtn.disabled = false;
+        twitterBtn.disabled = false;
+        isProcessed = true;
+      }, 50);
+    });
+
+    function applyPathBlur() {
+      const width = imageCanvas.width;
+      const height = imageCanvas.height;
+
+      // オフスクリーンCanvas（元画像用）
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = width;
+      offCanvas.height = height;
+      const offCtx = offCanvas.getContext('2d');
+      offCtx.drawImage(originalImage, 0, 0);
+      const srcData = offCtx.getImageData(0, 0, width, height).data;
+
+      // 累積用のFloat32配列（RGBA）
+      const accum = new Float32Array(width * height * 4);
+
+      const startPoint = strokePoints[0];
+      const step = parseInt(stepInput.value, 10);
+      
+      // サンプリング対象の点を取得
+      const sampledPoints = strokePoints.filter((_, index) => index % step === 0);
+      if (sampledPoints[sampledPoints.length - 1] !== strokePoints[strokePoints.length - 1]) {
+        sampledPoints.push(strokePoints[strokePoints.length - 1]);
+      }
+
+      const count = sampledPoints.length;
+
+      // 各地点でのシフト移動を計算して積算
+      for (let i = 0; i < count; i++) {
+        const pt = sampledPoints[i];
+        // 始点からの移動量 (dx, dy)
+        const dx = Math.round(pt.x - startPoint.x);
+        const dy = Math.round(pt.y - startPoint.y);
+
+        for (let y = 0; y < height; y++) {
+          const targetY = y + dy;
+          if (targetY < 0 || targetY >= height) continue;
+
+          for (let x = 0; x < width; x++) {
+            const targetX = x + dx;
+            if (targetX < 0 || targetX >= width) continue;
+
+            const srcIdx = (y * width + x) * 4;
+            const dstIdx = (targetY * width + targetX) * 4;
+
+            accum[dstIdx]     += srcData[srcIdx];     // R
+            accum[dstIdx + 1] += srcData[srcIdx + 1]; // G
+            accum[dstIdx + 2] += srcData[srcIdx + 2]; // B
+            accum[dstIdx + 3] += srcData[srcIdx + 3]; // A
+          }
+        }
+      }
+
+      // 出力用ImageDataを作成して平均化処理
+      const outImageData = imgCtx.createImageData(width, height);
+      const outData = outImageData.data;
+      const totalPixels = width * height * 4;
+
+      for (let i = 0; i < totalPixels; i += 4) {
+        outData[i]     = accum[i]     / count; // R
+        outData[i + 1] = accum[i + 1] / count; // G
+        outData[i + 2] = accum[i + 2] / count; // B
+        outData[i + 3] = accum[i + 3] / count; // A
+      }
+
+      // 処理結果を描画
+      imgCtx.putImageData(outImageData, 0, 0);
+
+      // 処理完了後、オーバーレイしていた赤線を消去
+      drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    }
+
+    // --- 保存＆シェア機能 ---
+    downloadBtn.addEventListener('click', () => {
+      if (!isProcessed) return;
+      const link = document.createElement('a');
+      link.download = 'long_exposure_blur.png';
+      link.href = imageCanvas.toDataURL('image/png');
+      link.click();
+    });
+
+    twitterBtn.addEventListener('click', () => {
+      if (!isProcessed) return;
+
+      // X (Twitter) はWeb API直接での画像添付投稿に対応していないため、画像を保存させた上で投稿画面を開きます
+      const link = document.createElement('a');
+      link.download = 'long_exposure_blur.png';
+      link.href = imageCanvas.toDataURL('image/png');
+      link.click();
+
+      const tweetText = encodeURIComponent("手振れ・長露光風の画像を作成しました！ #長露光エフェクト #画像加工");
+      const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
+      
+      alert("加工画像をダウンロードしました！\n開いたX (Twitter) の投稿画面に画像を貼り付けてシェアしてください。");
+      window.open(twitterUrl, '_blank');
+    });
+  </script>
 </body>
 </html>
